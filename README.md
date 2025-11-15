@@ -19,7 +19,7 @@ Learn how to set up Trend Finder and start monitoring trends in this video!
 ## How it Works
 
 1. **Data Collection** 📥
-   - Monitors selected influencers' posts on Twitter/X using the X API (Warning: the X API free plan is rate limited to only monitor 1 X account every 15 min)
+   - Monitors selected influencers' posts on Twitter/X using an Apify Actor (low-cost, usage-based pricing)
    - Monitors websites for new releases and news with Firecrawl's /extract
    - Runs on a scheduled basis using cron jobs
 
@@ -67,8 +67,12 @@ OPENAI_API_KEY=
 # Required if monitoring web pages (https://www.firecrawl.dev/)
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
 
-# Required if monitoring Twitter/X trends (https://developer.x.com/)
-X_API_BEARER_TOKEN=your_twitter_api_bearer_token_here
+# Required if monitoring Twitter/X trends with Apify (https://apify.com/)
+APIFY_API_TOKEN=your_apify_api_token_here
+# Optional: override the default Apify actor used for Twitter scraping
+# APIFY_TWITTER_ACTOR_ID=kaitoeasyapi~twitter-x-data-tweet-scraper-pay-per-result-cheapest
+# Optional: limit how many tweets are retrieved per account (max 100, default 20)
+# APIFY_TWITTER_MAX_ITEMS=20
 
 # Notification driver. Supported drivers: "slack", "discord"
 NOTIFICATION_DRIVER=discord
@@ -79,6 +83,14 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 # Required (if NOTIFICATION_DRIVER is "discord"): Incoming Webhook URL from Discord for notifications
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/WEBHOOK/URL
 ```
+
+### Configuring Apify for X scraping
+
+1. Create or log into your [Apify account](https://apify.com/).
+2. Generate a [personal API token](https://console.apify.com/account/integrations) and set it as `APIFY_API_TOKEN`.
+3. (Optional) Provide a different actor via `APIFY_TWITTER_ACTOR_ID` if you maintain your own tweet scraper.
+4. (Optional) Adjust `APIFY_TWITTER_MAX_ITEMS` to cap the number of tweets fetched per account on every run (defaults to 20, hard limit of 100).
+5. Re-run the application or restart your Docker container so the new environment variables take effect.
 
 ## Getting Started
 
