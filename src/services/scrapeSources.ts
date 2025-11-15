@@ -9,6 +9,11 @@ dotenv.config();
 // Initialize Firecrawl
 const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
 
+const apifyToken = process.env.APIFY_API_TOKEN;
+const apifyActorId =
+  process.env.APIFY_TWITTER_ACTOR_ID?.trim() ||
+  "kaitoeasyapi~twitter-x-data-tweet-scraper-pay-per-result-cheapest";
+
 // 1. Define the schema for our expected JSON
 const StorySchema = z.object({
   headline: z.string().describe("Story or post headline"),
@@ -37,7 +42,7 @@ export async function scrapeSources(
 
   // Configure toggles for scrapers
   const useScrape = true;
-  const useTwitter = true;
+  const useTwitter = Boolean(apifyToken);
   const tweetStartTime = new Date(
     Date.now() - 24 * 60 * 60 * 1000,
   ).toISOString();
@@ -52,39 +57,67 @@ export async function scrapeSources(
         if (!usernameMatch) continue;
         const username = usernameMatch[1];
 
-        // Construct the query and API URL
-        const query = `from:${username} has:media -is:retweet -is:reply`;
-        const encodedQuery = encodeURIComponent(query);
-        const encodedStartTime = encodeURIComponent(tweetStartTime);
-        const apiUrl = `https://api.x.com/2/tweets/search/recent?query=${encodedQuery}&max_results=10&start_time=${encodedStartTime}`;
+        if (!apifyToken) {
+          console.warn(
+            `Skipping X source for ${username} because APIFY_API_TOKEN is not configured.`,
+          );
+          continue;
+        }
+
+        const apifyUrl = `https://api.apify.com/v2/acts/${apifyActorId}/run-sync-get-dataset-items?token=${apifyToken}`;
+
+        const requestPayload = {
+          twitterContent: `from:${username} has:media -is:retweet -is:reply`,
+          maxItems: 10,
+          queryType: "Latest",
+          within_time: "1d",
+        };
 
         try {
-          const response = await fetch(apiUrl, {
+          const response = await fetch(apifyUrl, {
+            method: "POST",
             headers: {
-              Authorization: `Bearer ${process.env.X_API_BEARER_TOKEN}`,
+              "Content-Type": "application/json",
             },
+            body: JSON.stringify(requestPayload),
           });
           if (!response.ok) {
             throw new Error(
               `Failed to fetch tweets for ${username}: ${response.statusText}`,
             );
           }
-          const tweets = await response.json();
+          const tweetsResponse = await response.json();
+          const tweetItems = Array.isArray(tweetsResponse)
+            ? tweetsResponse
+            : Array.isArray(tweetsResponse?.items)
+            ? tweetsResponse.items
+            : [];
 
-          if (tweets.meta?.result_count === 0) {
+          if (!Array.isArray(tweetItems) || tweetItems.length === 0) {
             console.log(`No tweets found for username ${username}.`);
-          } else if (Array.isArray(tweets.data)) {
-            console.log(`Tweets found from username ${username}`);
-            const stories = tweets.data.map(
+            continue;
+          }
+
+          const stories = tweetItems
+            .filter((tweet: any) => tweet?.type === "tweet" && tweet?.id)
+            .map(
               (tweet: any): Story => ({
-                headline: tweet.text,
-                link: `https://x.com/i/status/${tweet.id}`,
-                date_posted: tweetStartTime,
+                headline: tweet.text ?? "",
+                link: tweet.url ?? `https://x.com/i/status/${tweet.id}`,
+                date_posted: tweet.createdAt
+                  ? new Date(tweet.createdAt).toISOString()
+                  : tweetStartTime,
               }),
-            );
+            )
+            .filter((story: Story) => story.headline && story.link);
+
+          if (stories.length > 0) {
+            console.log(`Tweets found from username ${username}`);
             combinedText.stories.push(...stories);
           } else {
-            console.error("Expected tweets.data to be an array:", tweets.data);
+            console.log(
+              `Apify response for ${username} did not contain usable tweets.`,
+            );
           }
         } catch (error: any) {
           console.error(`Error fetching tweets for ${username}:`, error);

@@ -7,7 +7,7 @@ export async function getCronSources(): Promise<{ identifier: string }[]> {
     console.log("Fetching sources...");
 
     // Check for required API keys
-    const hasXApiKey = !!process.env.X_API_BEARER_TOKEN;
+    const hasApifyKey = !!process.env.APIFY_API_TOKEN;
     const hasFirecrawlKey = !!process.env.FIRECRAWL_API_KEY;
 
     // Define sources based on available API keys
@@ -26,7 +26,7 @@ export async function getCronSources(): Promise<{ identifier: string }[]> {
             { identifier: "https://buttondown.com/ainews/archive/" },
           ]
         : []),
-      ...(hasXApiKey ? [{ identifier: "https://x.com/skirano" }] : []),
+      ...(hasApifyKey ? [{ identifier: "https://x.com/skirano" }] : []),
     ];
 
     // Return the full objects instead of mapping to strings
